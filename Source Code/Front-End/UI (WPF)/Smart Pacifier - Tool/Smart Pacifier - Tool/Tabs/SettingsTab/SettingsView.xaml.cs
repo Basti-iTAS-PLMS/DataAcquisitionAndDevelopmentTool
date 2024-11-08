@@ -11,9 +11,6 @@ using System.IO;
 
 namespace Smart_Pacifier___Tool.Tabs.SettingsTab
 {
-
-
-
     public partial class SettingsView : UserControl
     {
         private const string UserModeKey = "UserMode";
@@ -31,7 +28,6 @@ namespace Smart_Pacifier___Tool.Tabs.SettingsTab
             ?? throw new InvalidOperationException("SERVER_HOST environment variable is not set.");
         private readonly string serverUsername = Environment.GetEnvironmentVariable("SERVER_USERNAME")
             ?? throw new InvalidOperationException("SERVER_USERNAME environment variable is not set.");
-
 
         public SettingsView(ILocalHost localHost, string defaultView = "ModeButtons")
         {
@@ -53,7 +49,6 @@ namespace Smart_Pacifier___Tool.Tabs.SettingsTab
             UpdateThemeStates();
             SetDefaultView(defaultView);
         }
-
         private void SetDefaultView(string defaultView)
         {
             ModeButtonsPanel.Visibility = Visibility.Collapsed;
@@ -116,7 +111,7 @@ namespace Smart_Pacifier___Tool.Tabs.SettingsTab
 
         private void DockerInitialize(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show($"Initializing Docker at {localHostUrl} with API Key {localApiKey}");
+            MessageBox.Show($"Initializing Docker at {localHostUrl}");
             localHostService.DockerInitialize();
         }
 
@@ -261,7 +256,6 @@ namespace Smart_Pacifier___Tool.Tabs.SettingsTab
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-
         private void ServerButton_Click(object sender, RoutedEventArgs e)
         {
             TerminalPanel.Visibility = Visibility.Visible;
@@ -277,8 +271,6 @@ namespace Smart_Pacifier___Tool.Tabs.SettingsTab
             string serverUrl = $"http://{host}:8086";
             OpenServerWebView(serverUrl);
         }
-
-
         private void TerminalOutput_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
             if (e.Key == System.Windows.Input.Key.Enter)
@@ -309,7 +301,6 @@ namespace Smart_Pacifier___Tool.Tabs.SettingsTab
             serverHandler.Server_CopyDockerFiles();
         }
 
-
         private void Server_InitializeImageButton_Click(object sender, RoutedEventArgs e)
         {
             serverHandler.Server_InitializeDockerImage();
@@ -333,7 +324,6 @@ namespace Smart_Pacifier___Tool.Tabs.SettingsTab
             ServerWebViewBorder.Visibility = Visibility.Collapsed;
             TerminalPanel.Visibility = Visibility.Visible; // Show the terminal panel again
         }
-
 
         private void Server_StopDockerButton_Click(object sender, RoutedEventArgs e)
         {
