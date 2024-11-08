@@ -17,26 +17,22 @@ using SmartPacifier.BackEnd.CommunicationLayer.MQTT;
 using Smart_Pacifier___Tool.Tabs.MonitoringTab;
 using System.Configuration;
 using System.IO;
+using SmartPacifier.BackEnd.DatabaseLayer.InfluxDB.Connection.Server;
 namespace Smart_Pacifier___Tool
 {
     public partial class App : Application
     {
         // The IServiceProvider instance that manages the lifetime of services and dependencies
         private IServiceProvider? _serviceProvider;
-
         // Mutex instances to prevent multiple instances of the application and the broker
         private static Mutex? appMutex;
         private static Mutex? brokerMutex;
-
         // Expose the service provider publicly so other components can access it
         public IServiceProvider ServiceProvider => _serviceProvider!;
-
         [DllImport("kernel32.dll")]
         private static extern bool AllocConsole();
-
         [DllImport("kernel32.dll")]
         private static extern bool FreeConsole();
-
         private const string ThemeKey = "SelectedTheme";
 
         /// <summary>
@@ -48,7 +44,6 @@ namespace Smart_Pacifier___Tool
         protected override async void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
-
             // Ensure only one instance of the main application
             bool isAppNewInstance;
             appMutex = new Mutex(true, "SmartPacifierMainAppMutex", out isAppNewInstance);
@@ -58,25 +53,20 @@ namespace Smart_Pacifier___Tool
                 Shutdown();
                 return;
             }
-
             // Ensure only one instance of the MQTT client
             bool isBrokerNewInstance;
             brokerMutex = new Mutex(true, "SmartPacifierBrokerMutex", out isBrokerNewInstance);
-
             if (!isBrokerNewInstance)
             {
                 MessageBox.Show("The MQTT client is already running.");
                 Shutdown();
                 return;
             }
-
             // Load environment variables from config.env
             string envFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.env");
             Smart_Pacifier___Tool.Resources.OutputResources.EnvLoader.LoadEnvFile(envFilePath);
-
             // Allocate a console window for logging
             AllocConsole();
-
             // Retrieve the saved theme URI from settings
             string? themeUri = ConfigurationManager.AppSettings[ThemeKey];
             if (string.IsNullOrEmpty(themeUri))
@@ -84,24 +74,18 @@ namespace Smart_Pacifier___Tool
                 themeUri = "Resources/ColorsDark.xaml";
             }
             ApplyTheme(themeUri);
-
             // Create a new service collection that will hold our service registrations
             var services = new ServiceCollection();
-
             // Call the method that registers all necessary services
             ConfigureServices(services);
-
             // Build the service provider from the service collection (This is the Dependency Injection container)
             _serviceProvider = services.BuildServiceProvider();
-
             // Run BrokerMain asynchronously to avoid blocking the main UI thread
             var brokerMain = _serviceProvider.GetRequiredService<IBrokerMain>();
             await brokerMain.StartAsync(Array.Empty<string>()); // Await the task directly
-
             // Start the main window to keep the application running
 
         }
-
         /// <summary>
         /// Configures and registers all the services, managers, and other dependencies.
         /// This is where we register the InfluxDB client, services, managers, and UI components.
@@ -113,8 +97,6 @@ namespace Smart_Pacifier___Tool
             services.AddSingleton<ILocalHost, LocalHostSetup>();
             services.AddSingleton<IManagerPacifiers, ManagerPacifiers>();
             services.AddTransient<PacifierSelectionView>(); // Register PacifierSelectionView for DI
-
-
             // Register InfluxDBClient with the URL and token from ILocalHost
             services.AddSingleton<InfluxDBClient>(sp =>
             {
@@ -123,7 +105,6 @@ namespace Smart_Pacifier___Tool
 
                 return new InfluxDBClient("http://localhost:8086", apiKey);
             });
-
             // Register InfluxDatabaseService as IDatabaseService
             services.AddSingleton<IDatabaseService>(sp =>
             {
@@ -138,26 +119,25 @@ namespace Smart_Pacifier___Tool
                     "thu-de" // org
                 );
             });
-
+            // Register the ServerHandler as IServerHandler
+            services.AddSingleton<IServerHandler, ServerHandler>();
             // Register the Manager classes, injecting IDatabaseService where necessary
             services.AddSingleton<IManagerCampaign, ManagerCampaign>();
             services.AddSingleton<IManagerPacifiers, ManagerPacifiers>();
             services.AddSingleton<IManagerSensors, ManagerSensors>();
-
             // Register UI components
             services.AddSingleton<MainWindow>();
             services.AddSingleton<DeveloperView>();
             services.AddTransient<Func<string, SettingsView>>(sp => (defaultView) =>
             {
                 var localHostService = sp.GetRequiredService<ILocalHost>();
-                return new SettingsView(localHostService, defaultView);
+                var serverHandler = sp.GetRequiredService<IServerHandler>();
+                return new SettingsView(localHostService, serverHandler, defaultView);
             });
             services.AddTransient<CampaignsView>();
-
             // Register the BrokerMain class
             services.AddSingleton<IBrokerMain, BrokerMain>();
         }
-
         /// <summary>
         /// Applies the passed theme, clears all current resource dictionaries and adds them back
         /// </summary>

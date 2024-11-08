@@ -1,6 +1,4 @@
-﻿
-/*
-using System;
+﻿using System;
 using System.IO;
 using System.Net.Sockets;
 using System.Text;
@@ -8,10 +6,11 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Renci.SshNet;
 using Renci.SshNet.Common;
+using SmartPacifier.Interface.Services;
 
-namespace Smart_Pacifier___Tool.Tabs.SettingsTab
+namespace SmartPacifier.BackEnd.DatabaseLayer.InfluxDB.Connection.Server
 {
-    public class ServerHandler
+    public class ServerHandler: IServerHandler
     {
         private readonly string dockerComposeFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "docker-compose.yml");
         private readonly string mosquitoFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "mosquitto.conf");
@@ -205,6 +204,3 @@ namespace Smart_Pacifier___Tool.Tabs.SettingsTab
         }
     }
 }
-
-
-*/

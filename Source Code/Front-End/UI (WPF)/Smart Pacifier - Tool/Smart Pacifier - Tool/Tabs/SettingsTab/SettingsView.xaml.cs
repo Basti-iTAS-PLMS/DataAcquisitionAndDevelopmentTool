@@ -19,7 +19,7 @@ namespace Smart_Pacifier___Tool.Tabs.SettingsTab
         private const string ThemeKey = "SelectedTheme";
         private readonly ILocalHost localHostService;
         private bool isUserMode = true;
-        private readonly ServerHandler serverHandler;
+        private readonly IServerHandler serverHandler;
         private readonly string localHostUrl = Environment.GetEnvironmentVariable("LOCAL_HOST")
             ?? throw new InvalidOperationException("LOCAL_HOST environment variable is not set.");
         private readonly string localApiKey = Environment.GetEnvironmentVariable("LOCAL_API_KEY")
@@ -29,11 +29,11 @@ namespace Smart_Pacifier___Tool.Tabs.SettingsTab
         private readonly string serverUsername = Environment.GetEnvironmentVariable("SERVER_USERNAME")
             ?? throw new InvalidOperationException("SERVER_USERNAME environment variable is not set.");
 
-        public SettingsView(ILocalHost localHost, string defaultView = "ModeButtons")
+        public SettingsView(ILocalHost localHost, IServerHandler serverHandler,string defaultView = "ModeButtons")
         {
             InitializeComponent();
             localHostService = localHost;
-            serverHandler = new ServerHandler();
+            this.serverHandler = serverHandler;
             serverHandler.TerminalOutputReceived += UpdateTerminalOutput;
 
             if (Application.Current.Properties[UserModeKey] is bool userModeValue)

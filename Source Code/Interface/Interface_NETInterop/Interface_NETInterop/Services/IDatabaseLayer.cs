@@ -17,7 +17,6 @@ namespace SmartPacifier.Interface.Services
         string BaseUrl { get; }
         Task<DataTable> GetSensorDataAsync();
     }
-
     public interface IDataManipulationHandler
     {
         Task UpdateRowAsync(
@@ -30,8 +29,6 @@ namespace SmartPacifier.Interface.Services
         Task DeleteRowAsync(string measurement, Dictionary<string, string> tags, long timestampNanoseconds);
 
     }
-
-
     public interface ILocalHost
     {
         void StartDocker();
@@ -40,9 +37,6 @@ namespace SmartPacifier.Interface.Services
         void DockerInitialize();
 
     }
-
-
-
     public interface IManagerCampaign
     {
         Task AddCampaignAsync(string campaignName);
@@ -55,8 +49,6 @@ namespace SmartPacifier.Interface.Services
         Task<string> GetCampaignDataAsCSVAsync();
         Task<List<string>> GetCampaignsAsync();
     }
-
-
     public interface IManagerPacifiers
     {
 
@@ -67,15 +59,10 @@ namespace SmartPacifier.Interface.Services
         Task WriteDataAsync(string measurement, Dictionary<string, object> fields, Dictionary<string, string> tags);
 
     }
-
     public interface IManagerSensors
     {
         Task AddSensorDataAsync(string pacifierId, float ppgValue, float imuAccelX, float imuAccelY, float imuAccelZ);
     }
-
-
-
-
     public interface ICSVDataHandler
     {
 
@@ -84,11 +71,19 @@ namespace SmartPacifier.Interface.Services
         void EndCampaign(string campaignName);
 
     }
-
     public interface IInfluxDBParser
     {
-
-
+    }
+    public interface IServerHandler
+    {
+        void InitializeSshConnection(string host, string username, string privateKeyPath);
+        void ExecuteCommand(string command);
+        void DisconnectSsh();
+        void Server_CopyDockerFiles();
+        void Server_InitializeDockerImage();
+        void Server_StartDocker();
+        void Server_StopDocker();
+        event Action<string>? TerminalOutputReceived;
     }
 
 
