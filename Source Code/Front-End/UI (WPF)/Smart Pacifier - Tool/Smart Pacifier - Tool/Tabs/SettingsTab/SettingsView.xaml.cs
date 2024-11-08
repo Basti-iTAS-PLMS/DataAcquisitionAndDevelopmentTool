@@ -7,9 +7,13 @@ using System.Windows.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using SmartPacifier.BackEnd.DatabaseLayer.InfluxDB.Connection;
 using SmartPacifier.Interface.Services;
+using System.IO;
 
 namespace Smart_Pacifier___Tool.Tabs.SettingsTab
 {
+
+
+
     public partial class SettingsView : UserControl
     {
         private const string UserModeKey = "UserMode";
@@ -19,6 +23,15 @@ namespace Smart_Pacifier___Tool.Tabs.SettingsTab
         private readonly ILocalHost localHostService;
         private bool isUserMode = true;
         private readonly ServerHandler serverHandler;
+        private readonly string localHostUrl = Environment.GetEnvironmentVariable("LOCAL_HOST")
+            ?? throw new InvalidOperationException("LOCAL_HOST environment variable is not set.");
+        private readonly string localApiKey = Environment.GetEnvironmentVariable("LOCAL_API_KEY")
+            ?? throw new InvalidOperationException("LOCAL_API_KEY environment variable is not set.");
+        private readonly string serverHost = Environment.GetEnvironmentVariable("SERVER_HOST")
+            ?? throw new InvalidOperationException("SERVER_HOST environment variable is not set.");
+        private readonly string serverUsername = Environment.GetEnvironmentVariable("SERVER_USERNAME")
+            ?? throw new InvalidOperationException("SERVER_USERNAME environment variable is not set.");
+
 
         public SettingsView(ILocalHost localHost, string defaultView = "ModeButtons")
         {
@@ -103,17 +116,21 @@ namespace Smart_Pacifier___Tool.Tabs.SettingsTab
 
         private void DockerInitialize(object sender, RoutedEventArgs e)
         {
+            MessageBox.Show($"Initializing Docker at {localHostUrl} with API Key {localApiKey}");
             localHostService.DockerInitialize();
         }
 
         private void DockerStart_Click(object sender, RoutedEventArgs e)
         {
             localHostService.StartDocker();
+
             Task.Delay(2000).ContinueWith(_ =>
             {
                 Dispatcher.Invoke(() =>
                 {
-                    InfluxDbWebView.Source = new Uri("http://localhost:8086");
+                    // Use LOCAL_HOST from env file
+                    string localHostUrl = Environment.GetEnvironmentVariable("LOCAL_HOST") ?? "http://localhost:8086";
+                    InfluxDbWebView.Source = new Uri(localHostUrl);
                     InfluxDbWebView.Visibility = Visibility.Visible;
                     ApiKeyInput.Visibility = Visibility.Visible;
                     SubmitApiButton.Visibility = Visibility.Visible;
@@ -248,13 +265,17 @@ namespace Smart_Pacifier___Tool.Tabs.SettingsTab
         private void ServerButton_Click(object sender, RoutedEventArgs e)
         {
             TerminalPanel.Visibility = Visibility.Visible;
-            string host = "18.194.233.197";
-            string username = "ubuntu";
-            string privateKeyPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TeamKey.pem");
+
+            // Load server details from environment variables
+            string host = Environment.GetEnvironmentVariable("SERVER_HOST") ?? "default_host";
+            string username = Environment.GetEnvironmentVariable("SERVER_USERNAME") ?? "default_username";
+            string privateKeyPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TeamKey.pem");
+
             serverHandler.InitializeSshConnection(host, username, privateKeyPath);
 
-            // Open the Server WebView and show the close button
-            OpenServerWebView("http://18.194.233.197:8086"); // Replace <Server_IP> with the actual server IP
+            // Open the Server WebView using the server host from env variables
+            string serverUrl = $"http://{host}:8086";
+            OpenServerWebView(serverUrl);
         }
 
 
@@ -297,7 +318,10 @@ namespace Smart_Pacifier___Tool.Tabs.SettingsTab
         private void Server_StartDockerButton_Click(object sender, RoutedEventArgs e)
         {
             serverHandler.Server_StartDocker();
-            OpenServerWebView("http://18.194.233.197:8086"); // Replace <Server_IP> with the actual server IP
+
+            // Use SERVER_HOST from env file for the Server WebView
+            string serverUrl = $"http://{Environment.GetEnvironmentVariable("SERVER_HOST") ?? "default_host"}:8086";
+            OpenServerWebView(serverUrl);
         }
         private void OpenServerWebView(string url)
         {
