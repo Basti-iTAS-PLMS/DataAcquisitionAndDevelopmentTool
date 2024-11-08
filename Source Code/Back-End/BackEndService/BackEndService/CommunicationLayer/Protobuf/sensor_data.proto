@@ -2,13 +2,13 @@
 
 package Protos;
 
-message SensorData {
+message Sensor{
     string pacifier_id = 1;
     string sensor_type = 2;
     map<string, bytes> data_map = 3; // Dynamic key-value pairs for sensor data
 }
 
-message IMUData {
+message IMU{
     float gyro_x = 1;
     float gyro_y = 2;
     float gyro_z = 3;
@@ -20,7 +20,7 @@ message IMUData {
     float acc_z = 9;
 }
 
-message PPGData {
+message PPG{
     int32 led1 = 1;
     int32 led2 = 2;
     int32 led3 = 3;

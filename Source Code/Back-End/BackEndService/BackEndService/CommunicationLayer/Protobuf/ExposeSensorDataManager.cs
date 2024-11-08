@@ -15,7 +15,7 @@ namespace SmartPacifier.BackEnd.CommunicationLayer.Protobuf
         private static readonly object _instanceLock = new object();
         private static ExposeSensorDataManager? _instance;
 
-        private readonly List<SensorData> _sensorDataList = new List<SensorData>();
+        private readonly List<Sensor> _sensorDataList = new List<Sensor>();
         private readonly object _dataLock = new object();
 
         public event EventHandler? SensorDataUpdated;
@@ -43,7 +43,7 @@ namespace SmartPacifier.BackEnd.CommunicationLayer.Protobuf
                 string jsonString = Encoding.UTF8.GetString(data);
                 JsonDocument jsonDoc = JsonDocument.Parse(jsonString);
 
-                var sensorData = new SensorData
+                var sensorData = new Sensor
                 {
                     PacifierId = pacifierId
                 };
@@ -79,7 +79,7 @@ namespace SmartPacifier.BackEnd.CommunicationLayer.Protobuf
             IMessage? parsedMessage = null;
 
             foreach (var type in Assembly.GetExecutingAssembly().GetTypes()
-                     .Where(t => typeof(IMessage).IsAssignableFrom(t) && t != typeof(SensorData)))
+                     .Where(t => typeof(IMessage).IsAssignableFrom(t) && t != typeof(Sensor)))
             {
                 if (Activator.CreateInstance(type) is IMessage instance)
                 {
@@ -164,7 +164,7 @@ namespace SmartPacifier.BackEnd.CommunicationLayer.Protobuf
         /// <summary>
         /// Retrieves all sensor data entries as a list.
         /// </summary>
-        public List<SensorData> GetAllSensorData()
+        public List<Sensor> GetAllSensorData()
         {
             lock (_dataLock)
             {
