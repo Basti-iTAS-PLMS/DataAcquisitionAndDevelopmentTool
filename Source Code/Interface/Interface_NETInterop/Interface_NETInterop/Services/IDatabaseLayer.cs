@@ -18,6 +18,14 @@ namespace SmartPacifier.Interface.Services
         Task<DataTable> GetSensorDataAsync();
     }
 
+    public interface IDatabaseServiceSwitcher : IDatabaseService
+    {
+        void SwitchToLocal();
+        void SwitchToServer();
+        IDatabaseService GetCurrentDatabaseService();
+    }
+
+
     public interface IDataManipulationHandler
     {
         Task UpdateRowAsync(

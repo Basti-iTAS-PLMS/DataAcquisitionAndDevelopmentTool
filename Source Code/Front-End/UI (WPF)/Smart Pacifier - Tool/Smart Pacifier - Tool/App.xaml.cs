@@ -21,6 +21,7 @@ using System.Text.Json;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
+
 namespace Smart_Pacifier___Tool
 {
     public partial class App : Application
@@ -112,57 +113,50 @@ namespace Smart_Pacifier___Tool
             // Load database configuration from config.json
             var config = LoadDatabaseConfiguration();
 
-            // Determine which configuration to use
+            // Determine initial configuration to use
             bool useLocal = config.UseLocal == true;
 
-            // Set up the appropriate host and API key based on the configuration
-            string? host = useLocal ? config.Local?.Host : $"{config.Server?.Host}:{config.Server?.Port}";
-            string? apiKey = useLocal ? config.Local?.ApiKey : config.Server?.ApiKey;
-
-            // Check if Host or ApiKey is missing and throw an exception with a detailed message
-            if (string.IsNullOrEmpty(host) || string.IsNullOrEmpty(apiKey))
+            // Set up the local and server configurations
+            string localHost = config.Local?.Host ?? "http://localhost:8086";
+            if (!localHost.StartsWith("http://") && !localHost.StartsWith("https://"))
             {
-                MessageBox.Show("Host or API key is missing or improperly configured. Please check your configuration file.", "Configuration Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                throw new InvalidOperationException("Host or API key is missing or improperly configured.");
+                localHost = "http://" + localHost; // Add scheme if missing
             }
+            string localApiKey = config.Local?.ApiKey ?? string.Empty;
+            var localClient = new InfluxDBClient(localHost, localApiKey);
 
-            // Display which database is being used
-            string databaseType = useLocal ? "Local Database" : "Server Database";
-            MessageBox.Show($"Using {databaseType} at {host}", "Database Configuration", MessageBoxButton.OK, MessageBoxImage.Information);
-
-            // Ensure the host has the correct URI format
-            if (!host.StartsWith("http://") && !host.StartsWith("https://"))
+            string serverHost = $"{config.Server?.Host}:{config.Server?.Port}";
+            if (!serverHost.StartsWith("http://") && !serverHost.StartsWith("https://"))
             {
-                host = "http://" + host;
+                serverHost = "http://" + serverHost; // Add scheme if missing
             }
+            string serverApiKey = config.Server?.ApiKey ?? string.Empty;
+            var serverClient = new InfluxDBClient(serverHost, serverApiKey);
 
-            // Register InfluxDBClient with the validated host and API key
-            services.AddSingleton<InfluxDBClient>(sp => new InfluxDBClient(host, apiKey));
+            // Register InfluxDBClient based on whether we're using local or server configuration
+            services.AddSingleton(sp => useLocal ? localClient : serverClient);
 
-            // Register InfluxDatabaseService as IDatabaseService
-            services.AddSingleton<IDatabaseService>(sp =>
-            {
-                var influxClient = sp.GetRequiredService<InfluxDBClient>();
-                string org = "thu-de"; // Keep your org consistent
+            // Register local and server InfluxDatabaseService instances
+            var localService = new InfluxDatabaseService(localClient, localApiKey, localHost, "thu-de");
+            var serverService = new InfluxDatabaseService(serverClient, serverApiKey, serverHost, "thu-de");
 
-                return new InfluxDatabaseService(
-                    influxClient,
-                    apiKey, // API key retrieved from the configuration
-                    host,   // baseUrl from configuration
-                    org     // organization name
-                );
-            });
+            // Register DatabaseServiceSwitcher
+            var databaseSwitcher = new SmartPacifier.BackEnd.DatabaseLayer.InfluxDB.Connection.DatabaseServiceSwitcher(localService, serverService, useLocal);
+            services.AddSingleton<IDatabaseServiceSwitcher>(sp => databaseSwitcher);
+
+            // Register IDatabaseService to use the current database selected by DatabaseServiceSwitcher
+            services.AddSingleton<IDatabaseService>(sp => databaseSwitcher.GetCurrentDatabaseService());
 
             // Register other necessary services
             services.AddSingleton<ILocalHost, LocalHostSetup>();
-            services.AddSingleton<IManagerPacifiers, ManagerPacifiers>();
+            services.AddSingleton<IManagerPacifiers, ManagerPacifiers>(); // ManagerPacifiers will now receive InfluxDBClient and IDatabaseService
             services.AddSingleton<IManagerCampaign, ManagerCampaign>();
             services.AddSingleton<IManagerSensors, ManagerSensors>();
             services.AddSingleton<MainWindow>();
             services.AddSingleton<DeveloperView>();
             services.AddSingleton<IBrokerMain, BrokerMain>();
 
-            // UI component registration
+            // Register UI components
             services.AddTransient<PacifierSelectionView>();
             services.AddTransient<Func<string, SettingsView>>(sp => (defaultView) =>
             {
@@ -171,6 +165,9 @@ namespace Smart_Pacifier___Tool
             });
             services.AddTransient<CampaignsView>();
         }
+
+
+
 
 
         /// <summary>

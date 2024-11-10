@@ -258,17 +258,41 @@ namespace Smart_Pacifier___Tool.Tabs.SettingsTab
             ((MainWindow)Application.Current.MainWindow).NavigateTo(settingsView);
         }
 
-        private void LocalButton_Click(object sender, RoutedEventArgs e)
-        {
-            LocalHostPanel.Visibility = Visibility.Visible;
-            InfluxDbModePanel.Visibility = Visibility.Collapsed;
-            InfluxDbWebView.Visibility = Visibility.Hidden;
-        }
 
         private void RefreshButton_Click(object sender, RoutedEventArgs e)
         {
             InfluxDbWebView.Reload();
         }
+
+        private void LocalButton_Click(object sender, RoutedEventArgs e)
+        {
+            LocalHostPanel.Visibility = Visibility.Visible;
+            InfluxDbModePanel.Visibility = Visibility.Collapsed;
+            InfluxDbWebView.Visibility = Visibility.Hidden;
+
+            var databaseSwitcher = ((App)Application.Current).ServiceProvider.GetRequiredService<IDatabaseServiceSwitcher>();
+            databaseSwitcher.SwitchToLocal();
+
+            MessageBox.Show("Switched to Local Database", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void ServerButton_Click(object sender, RoutedEventArgs e)
+        {
+            TerminalPanel.Visibility = Visibility.Visible;
+            string privateKeyPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TeamKey.pem");
+
+            string serverUrl = serverHost;
+            serverHandler.InitializeSshConnection(serverUrl, serverUsername, privateKeyPath);
+
+            OpenServerWebView(serverUrl);
+
+            var databaseSwitcher = ((App)Application.Current).ServiceProvider.GetRequiredService<IDatabaseServiceSwitcher>();
+            databaseSwitcher.SwitchToServer();
+
+            MessageBox.Show("Switched to Server Database", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+
 
         /// <summary>
         /// Server Operations
@@ -276,18 +300,7 @@ namespace Smart_Pacifier___Tool.Tabs.SettingsTab
         /// <param name="sender"></param>
         /// <param name="e"></param>
 
-        private void ServerButton_Click(object sender, RoutedEventArgs e)
-        {
-            TerminalPanel.Visibility = Visibility.Visible;
-            string privateKeyPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TeamKey.pem");
 
-            // Initialize SSH connection with the complete server URL from configuration
-            string serverUrl = serverHost; // Use the host directly from configuration as a full URL
-            serverHandler.InitializeSshConnection(serverUrl, serverUsername, privateKeyPath);
-
-            // Display the URL directly if you still need to open a WebView
-            OpenServerWebView(serverUrl);
-        }
 
 
 
