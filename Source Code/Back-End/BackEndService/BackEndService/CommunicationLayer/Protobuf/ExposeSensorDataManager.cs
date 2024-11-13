@@ -43,10 +43,9 @@ namespace SmartPacifier.BackEnd.CommunicationLayer.Protobuf
                 var sensorData = SensorData.Parser.ParseFrom(data);
                 sensorData.SensorType = detectedSensorType;
 
-                // Get the message type corresponding to sensorData.SensorType
                 Type sensorMessageType = GetSensorMessageType(sensorData.SensorType);
                 MessageDescriptor sensorMessageDescriptor = null;
-                Dictionary<string, FieldDescriptor> fieldDescriptorMap = null;
+                Dictionary<string, FieldDescriptor> fieldDescriptorMap = new Dictionary<string, FieldDescriptor>();
 
                 if (sensorMessageType != null)
                 {
@@ -54,9 +53,6 @@ namespace SmartPacifier.BackEnd.CommunicationLayer.Protobuf
                     if (descriptorProperty != null)
                     {
                         sensorMessageDescriptor = descriptorProperty.GetValue(null) as MessageDescriptor;
-
-                        // Collect all field descriptors
-                        fieldDescriptorMap = new Dictionary<string, FieldDescriptor>();
                         CollectFieldDescriptors(sensorMessageDescriptor, fieldDescriptorMap);
                     }
                 }
@@ -65,18 +61,14 @@ namespace SmartPacifier.BackEnd.CommunicationLayer.Protobuf
                     Console.WriteLine($"Sensor message type not found for sensor type '{sensorData.SensorType}'.");
                 }
 
-                // Extract all fields dynamically, including nested structures
                 parsedData = ExtractAllFields(sensorData, fieldDescriptorMap);
 
-                // Display parsed fields immediately
                 Console.WriteLine($"Parsed data for Pacifier {pacifierId} on sensor type '{detectedSensorType}':");
                 DisplayParsedFields(parsedData);
 
-                // Add to sensor data list and trigger event
                 lock (_dataLock)
                 {
                     _sensorDataList.Add(sensorData);
-                    
                 }
                 SensorDataUpdated?.Invoke(this, EventArgs.Empty);
 
@@ -89,6 +81,7 @@ namespace SmartPacifier.BackEnd.CommunicationLayer.Protobuf
 
             return (pacifierId, detectedSensorType, parsedData);
         }
+
 
         // Retrieve a list of unique pacifier IDs
         public List<string> GetPacifierIds()
@@ -164,7 +157,7 @@ namespace SmartPacifier.BackEnd.CommunicationLayer.Protobuf
                 }
             }
         }
-        private Dictionary<string, object> ExtractAllFields(IMessage message, Dictionary<string, FieldDescriptor> fieldDescriptorMap = null)
+        private Dictionary<string, object> ExtractAllFields(IMessage message, Dictionary<string, FieldDescriptor> fieldDescriptorMap)
         {
             var result = new Dictionary<string, object>();
 
@@ -174,14 +167,14 @@ namespace SmartPacifier.BackEnd.CommunicationLayer.Protobuf
 
                 if (fieldValue is IMessage nestedMessage)
                 {
-                    result[field.Name] = ExtractAllFields(nestedMessage, fieldDescriptorMap); // Recursively handle nested messages
+                    result[field.Name] = ExtractAllFields(nestedMessage, fieldDescriptorMap);
                 }
                 else if (fieldValue is RepeatedField<IMessage> repeatedMessage)
                 {
                     var repeatedFields = new List<Dictionary<string, object>>();
                     foreach (var item in repeatedMessage)
                     {
-                        repeatedFields.Add(ExtractAllFields(item, fieldDescriptorMap)); // Recursively extract repeated messages
+                        repeatedFields.Add(ExtractAllFields(item, fieldDescriptorMap));
                     }
                     result[field.Name] = repeatedFields;
                 }
@@ -190,9 +183,19 @@ namespace SmartPacifier.BackEnd.CommunicationLayer.Protobuf
                     var decodedDataMap = new Dictionary<string, object>();
                     foreach (var kvp in dataMap)
                     {
-                        // Decode the ByteString without field descriptors
-                        var decodedValue = DecodeByteStringDynamic(kvp.Value, kvp.Key);
-                        decodedDataMap[kvp.Key] = decodedValue;
+                        string key = kvp.Key;
+                        ByteString value = kvp.Value;
+
+                        if (fieldDescriptorMap != null && fieldDescriptorMap.TryGetValue(key, out var fieldDescriptor))
+                        {
+                            var decodedValue = DecodeByteStringWithDescriptor(value, fieldDescriptor, fieldDescriptorMap);
+                            decodedDataMap[key] = decodedValue;
+                        }
+                        else
+                        {
+                            var decodedValue = DecodeByteStringDynamic(value, key);
+                            decodedDataMap[key] = decodedValue;
+                        }
                     }
                     result[field.Name] = decodedDataMap;
                 }
@@ -204,6 +207,147 @@ namespace SmartPacifier.BackEnd.CommunicationLayer.Protobuf
 
             return result;
         }
+
+        private object DecodeByteStringWithDescriptor(ByteString byteString, FieldDescriptor fieldDescriptor, Dictionary<string, FieldDescriptor> fieldDescriptorMap)
+        {
+            var bytes = byteString.ToByteArray();
+
+            try
+            {
+                if (fieldDescriptor.IsRepeated)
+                {
+                    if (fieldDescriptor.FieldType == FieldType.Message)
+                    {
+                        var messageType = fieldDescriptor.MessageType.ClrType;
+                        var parser = (MessageParser)messageType.GetProperty("Parser").GetValue(null);
+                        return ParseRepeatedMessages(bytes, parser, fieldDescriptorMap);
+                    }
+                    else
+                    {
+                        return ParseRepeatedScalars(bytes, fieldDescriptor);
+                    }
+                }
+                else
+                {
+                    if (fieldDescriptor.FieldType == FieldType.Message)
+                    {
+                        var messageType = fieldDescriptor.MessageType.ClrType;
+                        var parser = (MessageParser)messageType.GetProperty("Parser").GetValue(null);
+                        var message = parser.ParseFrom(bytes);
+                        return ExtractAllFields(message, fieldDescriptorMap);
+                    }
+                    else
+                    {
+                        return ParseScalarValue(bytes, fieldDescriptor);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error decoding '{fieldDescriptor.Name}': {ex.Message}");
+                return null;
+            }
+        }
+
+        private List<Dictionary<string, object>> ParseRepeatedMessages(byte[] bytes, MessageParser parser, Dictionary<string, FieldDescriptor> fieldDescriptorMap)
+        {
+            var messages = new List<Dictionary<string, object>>();
+            var inputStream = new CodedInputStream(bytes);
+
+            while (!inputStream.IsAtEnd)
+            {
+                var message = parser.ParseFrom(inputStream);
+                var extractedFields = ExtractAllFields(message, fieldDescriptorMap);
+                messages.Add(extractedFields);
+            }
+
+            return messages;
+        }
+
+        private object ParseRepeatedScalars(byte[] bytes, FieldDescriptor fieldDescriptor)
+        {
+            var results = new List<object>();
+            var inputStream = new CodedInputStream(bytes);
+
+            while (!inputStream.IsAtEnd)
+            {
+                switch (fieldDescriptor.FieldType)
+                {
+                    case FieldType.Double:
+                        results.Add(inputStream.ReadDouble());
+                        break;
+                    case FieldType.Float:
+                        results.Add(inputStream.ReadFloat());
+                        break;
+                    case FieldType.Int64:
+                    case FieldType.SInt64:
+                    case FieldType.Fixed64:
+                        results.Add(inputStream.ReadInt64());
+                        break;
+                    case FieldType.UInt64:
+                        results.Add(inputStream.ReadUInt64());
+                        break;
+                    case FieldType.Int32:
+                    case FieldType.SInt32:
+                    case FieldType.Fixed32:
+                        results.Add(inputStream.ReadInt32());
+                        break;
+                    case FieldType.UInt32:
+                        results.Add(inputStream.ReadUInt32());
+                        break;
+                    case FieldType.Bool:
+                        results.Add(inputStream.ReadBool());
+                        break;
+                    case FieldType.String:
+                        results.Add(inputStream.ReadString());
+                        break;
+                    case FieldType.Bytes:
+                        results.Add(inputStream.ReadBytes().ToByteArray());
+                        break;
+                    case FieldType.Enum:
+                        results.Add(inputStream.ReadEnum());
+                        break;
+                    default:
+                        throw new NotSupportedException($"Unsupported field type {fieldDescriptor.FieldType} for repeated scalar field.");
+                }
+            }
+
+            return results;
+        }
+
+        private object ParseScalarValue(byte[] bytes, FieldDescriptor fieldDescriptor)
+        {
+            switch (fieldDescriptor.FieldType)
+            {
+                case FieldType.Double:
+                    return BitConverter.ToDouble(bytes, 0);
+                case FieldType.Float:
+                    return BitConverter.ToSingle(bytes, 0);
+                case FieldType.Int64:
+                case FieldType.SInt64:
+                case FieldType.Fixed64:
+                    return BitConverter.ToInt64(bytes, 0);
+                case FieldType.UInt64:
+                    return BitConverter.ToUInt64(bytes, 0);
+                case FieldType.Int32:
+                case FieldType.SInt32:
+                case FieldType.Fixed32:
+                    return BitConverter.ToInt32(bytes, 0);
+                case FieldType.UInt32:
+                    return BitConverter.ToUInt32(bytes, 0);
+                case FieldType.Bool:
+                    return BitConverter.ToBoolean(bytes, 0);
+                case FieldType.String:
+                    return System.Text.Encoding.UTF8.GetString(bytes);
+                case FieldType.Bytes:
+                    return bytes;
+                case FieldType.Enum:
+                    return BitConverter.ToInt32(bytes, 0);
+                default:
+                    throw new NotSupportedException($"Unsupported field type {fieldDescriptor.FieldType} for scalar field.");
+            }
+        }
+
 
         private object DecodeByteStringDynamic(ByteString byteString, string key)
         {
