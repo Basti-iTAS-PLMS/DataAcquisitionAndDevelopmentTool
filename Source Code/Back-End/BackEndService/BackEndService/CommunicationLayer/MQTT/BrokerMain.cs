@@ -90,32 +90,33 @@ namespace SmartPacifier.BackEnd.CommunicationLayer.MQTT
                 //     }
                 // }
 
+                // TODO: check if this is correct. Seems like multiple instantiation.
                 // Forward the parsed data to Python using SensorDataForwardingService
-                try
-                {
-                    // Get the base directory dynamically
-                    string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
-
-                    // Construct the path to the Python script dynamically
-                    string pythonScriptPath = System.IO.Path.Combine(
-                        baseDirectory,
-                        "Resources",
-                        "OutputResources",
-                        "PythonFiles",
-                        "ExecutableScript",
-                        "python1.py"
-                    );
-
-                    // Create an instance of SensorDataForwardingService
-                    var forwardingService = new SensorDataForwardingService(pythonScriptPath);
-
-                    // Forward the parsed data to the Python script (use await instead of Wait)
-                    await forwardingService.ForwardAndProcessDataAsync(parsedPacifierId, sensorType, parsedData);
-                }
-                catch (Exception forwardEx)
-                {
-                    Console.WriteLine($"Error forwarding data for Pacifier {pacifierId} to Python script: {forwardEx.Message}");
-                }
+                // try
+                // {
+                //     // Get the base directory dynamically
+                //     string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
+                //     
+                //     // Construct the path to the Python script dynamically
+                //     string pythonScriptPath = System.IO.Path.Combine(
+                //         baseDirectory,
+                //         "Resources",
+                //         "OutputResources",
+                //         "PythonFiles",
+                //         "ExecutableScript",
+                //         "python1.py"
+                //     );
+                //     
+                //     // Create an instance of SensorDataForwardingService
+                //     var forwardingService = new SensorDataForwardingService(pythonScriptPath);
+                //     
+                //     // Forward the parsed data to the Python script (use await instead of Wait)
+                //     await forwardingService.ForwardAndProcessDataAsync(parsedPacifierId, sensorType, parsedData);
+                // }
+                // catch (Exception forwardEx)
+                // {
+                //     Console.WriteLine($"Error forwarding data for Pacifier {pacifierId} to Python script: {forwardEx.Message}");
+                // }
             }
             catch (Exception ex)
             {
