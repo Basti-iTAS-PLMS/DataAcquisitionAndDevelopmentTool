@@ -68,7 +68,7 @@ namespace Smart_Pacifier___Tool.Components
         }
 
 
-        public ObservableCollection<byte[]> RawData { get; private set; } = new ObservableCollection<byte[]>();
+        public ObservableCollection<byte[]> RawData { get; private set; } = [];
 
         public string ButtonText
         {

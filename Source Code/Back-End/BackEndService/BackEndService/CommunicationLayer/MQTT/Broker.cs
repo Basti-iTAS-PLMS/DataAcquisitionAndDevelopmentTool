@@ -180,23 +180,19 @@ namespace SmartPacifier.BackEnd.CommunicationLayer.MQTT
             }
         }
 
-        public class MessageReceivedEventArgs : EventArgs
+        public class MessageReceivedEventArgs(
+            string topic,
+            byte[] payload,
+            string pacifierId,
+            string sensorType,
+            ObservableCollection<Dictionary<string, object>> parsedData)
+            : EventArgs
         {
-            public string Topic { get; set; }
-            public byte[] Payload { get; set; }
-            public string PacifierId { get; set; }
-            public string SensorType { get; set; }
-            public ObservableCollection<Dictionary<string, object>> ParsedData { get; set; }
-
-            public MessageReceivedEventArgs(string topic, byte[] payload, string pacifierId, string sensorType,
-                ObservableCollection<Dictionary<string, object>> parsedData)
-            {
-                Topic = topic;
-                Payload = payload;
-                PacifierId = pacifierId;
-                SensorType = sensorType;
-                ParsedData = parsedData;
-            }
+            public string Topic { get; set; } = topic;
+            public byte[] Payload { get; set; } = payload;
+            public string PacifierId { get; set; } = pacifierId;
+            public string SensorType { get; set; } = sensorType;
+            public ObservableCollection<Dictionary<string, object>> ParsedData { get; set; } = parsedData;
         }
     }
 }

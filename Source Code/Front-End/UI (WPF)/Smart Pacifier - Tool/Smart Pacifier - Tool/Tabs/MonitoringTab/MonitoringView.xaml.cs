@@ -33,7 +33,6 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab
     /// </summary>
     public partial class MonitoringView : UserControl, INotifyCollectionChanged
     {
-
         private readonly MonitoringViewModel _viewModel;
         public event NotifyCollectionChangedEventHandler? CollectionChanged;
         public const string DeveloperTabVisibleKey = "DeveloperTabVisible";
@@ -42,7 +41,8 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab
         /// 
         /// </summary>
         /// <param name="selectedPacifiers"></param>
-        public MonitoringView(ObservableCollection<PacifierItem> selectedPacifiers, ILineProtocol lineProtocol, string currentCampaignName)
+        public MonitoringView(ObservableCollection<PacifierItem> selectedPacifiers, ILineProtocol lineProtocol,
+            string currentCampaignName)
         {
             InitializeComponent();
 
@@ -67,12 +67,9 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab
             {
                 pacifier.Sensors.CollectionChanged += OnSensorTypesCollectionChanged;
             }
-
-
         }
 
         // ================ Extra ===============
-
 
 
         // ================ Real-Time ===============
@@ -82,14 +79,14 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab
             // Debug.WriteLine($"Monitoring: SensorTypes CollectionChanged Called");
 
             // Only call AddSensorItems if there are new items added to the collection
-            if (e.Action == NotifyCollectionChangedAction.Add && e.NewItems != null)
-            {
-                // Convert e.NewItems (which is an IList) to an ObservableCollection<Sensor>
-                ObservableCollection<SensorItem> newSensors = new ObservableCollection<SensorItem>(e.NewItems.Cast<SensorItem>());
+            if (e is not { Action: NotifyCollectionChangedAction.Add, NewItems: not null })
+                return;
 
-                // Now you can pass the ObservableCollection<Sensor> to AddSensorItems
-                AddSensorItems(newSensors);
-            }
+            // Convert e.NewItems (which is an IList) to an ObservableCollection<Sensor>
+            var newSensors = new ObservableCollection<SensorItem>(e.NewItems.Cast<SensorItem>());
+
+            // Now you can pass the ObservableCollection<Sensor> to AddSensorItems
+            AddSensorItems(newSensors);
         }
 
 
@@ -103,14 +100,14 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab
         {
             foreach (var pacifierItem in selectedPacifiers)
             {
-                    pacifierItem.IsChecked = false;
-                    //Debug.WriteLine($"Monitoring: Pacifier ID: {pacifierItem.PacifierId}");
+                pacifierItem.IsChecked = false;
+                //Debug.WriteLine($"Monitoring: Pacifier ID: {pacifierItem.PacifierId}");
 
-                    pacifierItem.ButtonText = $"Pacifier {pacifierItem.PacifierId}";
-                    pacifierItem.CircleText = " ";
+                pacifierItem.ButtonText = $"Pacifier {pacifierItem.PacifierId}";
+                pacifierItem.CircleText = " ";
 
-                    pacifierItem.ToggleChanged += (s, e) => UpdateCircleText(pacifierItem);
-                    _viewModel.PacifierItems.Add(pacifierItem);
+                pacifierItem.ToggleChanged += (s, e) => UpdateCircleText(pacifierItem);
+                _viewModel.PacifierItems.Add(pacifierItem);
             }
         }
 
@@ -133,7 +130,6 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab
         }
 
 
-
         // ================ Sensor Items - DONE ===============
 
         /// <summary>
@@ -142,21 +138,16 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab
         /// <param name="sensorTypes"></param>
         private void AddSensorItems(ObservableCollection<SensorItem> sensorItems)
         {
-
             foreach (var sensorItem in sensorItems)
             {
-
                 //Debug.WriteLine($"Monitoring: Pacifier ID: {pacifierItem.PacifierId}");
-                if (!_viewModel.SensorItems.Any(p => p.SensorId == sensorItem.SensorId))
-                {
-                    
-                    sensorItem.SensorButtonText = $"{sensorItem.SensorId}";
-                    sensorItem.SensorCircleText = " ";
-                    sensorItem.ToggleChanged += (s, e) => UpdateSensorCircleText(sensorItem);
-                    _viewModel.SensorItems.Add(sensorItem);
+                if (_viewModel.SensorItems.Any(p => p.SensorId == sensorItem.SensorId))
+                    return;
 
-                }
-                
+                sensorItem.SensorButtonText = $"{sensorItem.SensorId}";
+                sensorItem.SensorCircleText = " ";
+                sensorItem.ToggleChanged += (s, e) => UpdateSensorCircleText(sensorItem);
+                _viewModel.SensorItems.Add(sensorItem);
             }
         }
 
@@ -197,14 +188,12 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab
                     _viewModel._lastUpdateTimestamps[key] = DateTime.Now.AddMilliseconds(-10000);
                     Debug.WriteLine($"New timestamp entry: {key}");
                 }
-               
             }
             else
             {
                 pacifierItem.CircleText = " ";
                 _viewModel.CheckedPacifierItems.Remove(pacifierItem);
                 RemovePacifierGrid(pacifierItem);
-
             }
         }
 
@@ -227,14 +216,12 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab
                     _viewModel._lastUpdateTimestamps[key] = DateTime.Now.AddMilliseconds(-10000);
                     Debug.WriteLine($"New timestamp entry: {key}");
                 }
-                
             }
             else
             {
                 sensorItem.SensorCircleText = " ";
                 _viewModel.CheckedSensorItems.Remove(sensorItem);
                 RemoveGraphRowsForSensorItem(sensorItem);
-
             }
         }
 
@@ -378,10 +365,11 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab
                 Style = (Style)Application.Current.FindResource("ModernButtonStyle"),
                 Tag = pacifierItem.PacifierId
             };
-            
-            debugButton.Visibility = (Application.Current.Properties[DeveloperTabVisibleKey] is bool isVisible && isVisible)
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+
+            debugButton.Visibility =
+                (Application.Current.Properties[DeveloperTabVisibleKey] is bool isVisible && isVisible)
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
 
             Grid.SetRow(debugButton, 0);
             Grid.SetColumn(debugButton, 2);
@@ -478,9 +466,9 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab
             }
 
 
-            Debug.WriteLine($"Monitoring: Added SensorRow for Pacifier {pacifierItem.PacifierId}, Sensor {sensorItem.SensorId}");
+            Debug.WriteLine(
+                $"Monitoring: Added SensorRow for Pacifier {pacifierItem.PacifierId}, Sensor {sensorItem.SensorId}");
         }
-
 
 
         private void AddGraphRowsForToggledSensorsForAllPacifiers(SensorItem sensorItem)
@@ -534,7 +522,8 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab
                     pacifierGrid.RowDefinitions.RemoveAt(rowIndex);
                 }
 
-                Debug.WriteLine($"Monitoring: Removed SensorRow for Pacifier {pacifierItem.PacifierId}, Sensor {sensorItem.SensorId}");
+                Debug.WriteLine(
+                    $"Monitoring: Removed SensorRow for Pacifier {pacifierItem.PacifierId}, Sensor {sensorItem.SensorId}");
             }
 
 
@@ -554,7 +543,8 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab
                     pacifierGrid.RowDefinitions.RemoveAt(rowIndex);
                 }
 
-                Debug.WriteLine($"Monitoring: Removed SensorRow for Pacifier {pacifierItem.PacifierId}, Sensor {sensorItem.SensorId}");
+                Debug.WriteLine(
+                    $"Monitoring: Removed SensorRow for Pacifier {pacifierItem.PacifierId}, Sensor {sensorItem.SensorId}");
             }
         }
 
@@ -578,17 +568,20 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab
                 {
                     var firstKvp = sensorGroup.FirstOrDefault();
 
-                    if (firstKvp.Key != null && firstKvp.Key == "sensorGroup") // Ensure there's at least one key-value pair
+                    if (firstKvp.Key != null &&
+                        firstKvp.Key == "sensorGroup") // Ensure there's at least one key-value pair
                     {
                         var groupName = firstKvp.Value;
 
                         foreach (UIElement child in pacifierGrid.Children)
                         {
                             // Find the sensor text row by matching the SensorId in the TextBlock
-                            if (child is Border border && border.Child is TextBlock textBlock && textBlock.Text == $"Sensor: {sensorItem.SensorId}")
+                            if (child is Border border && border.Child is TextBlock textBlock &&
+                                textBlock.Text == $"Sensor: {sensorItem.SensorId}")
                             {
                                 pacifierGrid.Children.Remove(child);
-                                Debug.WriteLine($"Monitoring: Removed Sensor Row for Pacifier {pacifierItem.PacifierId}, Sensor {sensorItem.SensorId}");
+                                Debug.WriteLine(
+                                    $"Monitoring: Removed Sensor Row for Pacifier {pacifierItem.PacifierId}, Sensor {sensorItem.SensorId}");
                                 break; // Since we're only removing one row, break the loop after removal
                             }
                         }
@@ -596,7 +589,8 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab
                         // Remove the corresponding WrapPanel (graph row)
                         var wrapPanelToRemove = pacifierGrid.Children
                             .OfType<WrapPanel>()
-                            .FirstOrDefault(wrapPanel => wrapPanel.Uid == $"{pacifierItem.PacifierId}_{sensorItem.SensorId}");
+                            .FirstOrDefault(wrapPanel =>
+                                wrapPanel.Uid == $"{pacifierItem.PacifierId}_{sensorItem.SensorId}");
 
                         if (wrapPanelToRemove != null)
                         {
@@ -609,7 +603,8 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab
                             //    pacifierGrid.RowDefinitions.RemoveAt(rowIndex);
                             //}
 
-                            Debug.WriteLine($"Monitoring: Removed graph row for {groupName} in Pacifier {pacifierItem.PacifierId}");
+                            Debug.WriteLine(
+                                $"Monitoring: Removed graph row for {groupName} in Pacifier {pacifierItem.PacifierId}");
                         }
                     }
                 }
@@ -624,7 +619,6 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab
         /// <returns></returns>
         private Grid? FindPacifierGridForSensor(PacifierItem pacifierItem)
         {
-
             var gridToFind = pacifierSectionsPanel.Children
                 .OfType<Grid>()
                 .FirstOrDefault(g => g.Uid == $"Grid_{pacifierItem.PacifierId}");
@@ -640,11 +634,9 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab
         }
 
 
-
         // Create multiple Graphs for a SensorItem based on its SensorGroups
-        private WrapPanel CreateGraphForSensor(PacifierItem pacifierItem,SensorItem sensorItem)
+        private WrapPanel CreateGraphForSensor(PacifierItem pacifierItem, SensorItem sensorItem)
         {
-
             // Create a unique identifier for the graph
             string uniqueUid = $"{pacifierItem.PacifierId}_{sensorItem.SensorId}";
 
@@ -661,7 +653,6 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab
             // Iterate through each SensorGroup in the SensorItem
             foreach (var sensorGroup in sensorItem.SensorGroups)
             {
-
                 // Retrieve the saved interval for this SensorItem and SensorGroup from the dictionary
                 int interval = _viewModel.SensorIntervals[sensorGroup];
                 Debug.WriteLine($"Monitoring: Interval is {interval}");
@@ -675,7 +666,7 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab
                     Height = 250,
                     Uid = uniquePlotId,
                     Name = sensorGroup,
-                    PlotId = uniquePlotId,  // Ensure unique PlotId
+                    PlotId = uniquePlotId, // Ensure unique PlotId
                     HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
                     Margin = new Thickness(5)
                 };
@@ -686,14 +677,14 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab
                 // Optionally set specific properties (like disabling zoom) if handled in the class
 
 
-
                 // Add the graph to the SensorItem's collection for future reference
                 sensorItem.SensorGraphs.Add(graph);
 
                 // Add the graph to the WrapPanel for UI display
                 graphPanel.Children.Add(graph);
 
-                Debug.WriteLine($"Monitoring: Created Graph for Sensor Group {sensorGroup} with unique PlotId {uniquePlotId}");
+                Debug.WriteLine(
+                    $"Monitoring: Created Graph for Sensor Group {sensorGroup} with unique PlotId {uniquePlotId}");
             }
 
             return graphPanel;
@@ -731,7 +722,6 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab
                         parent.Content = rawDataView;
                     }
                 }
-
             }
         }
 
@@ -744,8 +734,8 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab
         {
             if (_viewModel.CheckedSensorItems.Count > 0)
             {
-
-                var dialog = new IntervalSettingsDialog(new List<PacifierItem>(_viewModel.CheckedPacifierItems), new List<SensorItem>(_viewModel.CheckedSensorItems), _viewModel.SensorIntervals);
+                var dialog = new IntervalSettingsDialog(new List<PacifierItem>(_viewModel.CheckedPacifierItems),
+                    new List<SensorItem>(_viewModel.CheckedSensorItems), _viewModel.SensorIntervals);
                 if (dialog.ShowDialog() == true)
                 {
                     var intervals = dialog.SensorIntervals;
@@ -803,7 +793,8 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab
             else
             {
                 // User chose not to proceed
-                MessageBox.Show("Campaign not ended.", "Operation Cancelled", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Campaign not ended.", "Operation Cancelled", MessageBoxButton.OK,
+                    MessageBoxImage.Information);
             }
         }
 
@@ -818,7 +809,8 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab
                 _viewModel.LineProtocolService.UpdateStoppedEntryTime(_viewModel.CurrentCampaignName, endTime);
 
                 // Show a success message
-                MessageBox.Show("Campaign has been successfully ended.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Campaign has been successfully ended.", "Success", MessageBoxButton.OK,
+                    MessageBoxImage.Information);
 
                 // Unsubscribe from real-time updates to stop file writing
                 Broker.Instance.MessageReceived -= _viewModel.OnMessageReceived;
@@ -834,19 +826,16 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab
                 await fileUpload.UploadDataAsync(campaignName);
 
                 // Retrieve PacifierSelectionView from the DI container and navigate to it
-                var pacifierSelectionView = ((App)Application.Current).ServiceProvider.GetRequiredService<PacifierSelectionView>();
+                var pacifierSelectionView =
+                    ((App)Application.Current).ServiceProvider.GetRequiredService<PacifierSelectionView>();
                 ((MainWindow)Application.Current.MainWindow).NavigateTo(pacifierSelectionView);
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error ending campaign: {ex.Message}");
-                MessageBox.Show($"Failed to end campaign. Error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"Failed to end campaign. Error: {ex.Message}", "Error", MessageBoxButton.OK,
+                    MessageBoxImage.Error);
             }
         }
-
-
-
-
     }
 }
-

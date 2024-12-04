@@ -27,12 +27,12 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab.MonitoringExtra
     public class MonitoringViewModel : INotifyPropertyChanged
     {
         // ObservableCollections to bind to UI for Pacifiers and Sensors
-        public ObservableCollection<PacifierItem> _pacifierItems = new ObservableCollection<PacifierItem>();
-        public ObservableCollection<SensorItem> _sensorItems = new ObservableCollection<SensorItem>();
+        public ObservableCollection<PacifierItem> _pacifierItems = [];
+        public ObservableCollection<SensorItem> _sensorItems = [];
 
         // Memorizes the order for toggling buttons
-        public ObservableCollection<PacifierItem> _checkedPacifierItems = new ObservableCollection<PacifierItem>();
-        public ObservableCollection<SensorItem> _checkedSensorItems = new ObservableCollection<SensorItem>();
+        public ObservableCollection<PacifierItem> _checkedPacifierItems = [];
+        public ObservableCollection<SensorItem> _checkedSensorItems = [];
 
         public Dictionary<string, int> SensorIntervals { get; private set; } = new Dictionary<string, int>();
 
@@ -40,11 +40,14 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab.MonitoringExtra
 
         // Maps for storing grid and row references
         public Dictionary<PacifierItem, Grid> PacifierGridMap = new Dictionary<PacifierItem, Grid>();
-        public Dictionary<Tuple<PacifierItem, SensorItem>, RowDefinition> SensorRowMap = new Dictionary<Tuple<PacifierItem, SensorItem>, RowDefinition>();
+
+        public Dictionary<Tuple<PacifierItem, SensorItem>, RowDefinition> SensorRowMap =
+            new Dictionary<Tuple<PacifierItem, SensorItem>, RowDefinition>();
 
         public Dictionary<PacifierItem, DateTime> _lastPacifierUpdate = new Dictionary<PacifierItem, DateTime>();
 
-        private Dictionary<PacifierItem, CancellationTokenSource> _pacifierCancellationTokens = new Dictionary<PacifierItem, CancellationTokenSource>();
+        private Dictionary<PacifierItem, CancellationTokenSource> _pacifierCancellationTokens =
+            new Dictionary<PacifierItem, CancellationTokenSource>();
 
 
         private readonly ILineProtocol _lineProtocol;
@@ -120,8 +123,6 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab.MonitoringExtra
         // Constructor initializing empty ObservableCollections
         public MonitoringViewModel(ILineProtocol lineProtocol, string currentCampaignName)
         {
-
-
             _lineProtocol = lineProtocol ?? throw new ArgumentNullException(nameof(lineProtocol));
             _currentCampaignName = currentCampaignName;
 
@@ -146,7 +147,6 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab.MonitoringExtra
         /// </summary>
         public void OnMessageReceived(object? sender, Broker.MessageReceivedEventArgs e)
         {
-
             if (!IsCampaignActive)
             {
                 Debug.WriteLine("Campaign has ended. Ignoring incoming messages.");
@@ -158,7 +158,8 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab.MonitoringExtra
             string entryTime = dateTime.ToString("yyyy-MM-dd HH:mm:ss.fff");
 
             // Only proceed if the pacifier ID is in the checkedPacifiers list and data is valid
-            if (PacifierItems.Any(p => p.PacifierId == e.PacifierId) && e.SensorType != null && e.ParsedData != null)
+            if (PacifierItems.Any(p => p.PacifierId == e.PacifierId) &&
+                e is { SensorType: not null, ParsedData: not null })
             {
                 try
                 {
@@ -167,122 +168,123 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab.MonitoringExtra
                     {
                         // Find the PacifierItem in PacifierItems with a matching ItemId and also in checkedPacifiers
                         var pacifierItem = PacifierItems.FirstOrDefault(p => p.PacifierId == e.PacifierId);
-                        var pacifiercount = PacifierItems.Count;
+                        var pacifierItemsCount = PacifierItems.Count;
 
-                        if (pacifierItem != null)
+                        if (pacifierItem is null)
+                            return;
+
+                        // Cancel any existing timeout for this pacifier
+                        if (_pacifierCancellationTokens.TryGetValue(pacifierItem, out var tokenSource))
                         {
-                            // Cancel any existing timeout for this pacifier
-                            if (_pacifierCancellationTokens.ContainsKey(pacifierItem))
+                            tokenSource.Cancel();
+                            _pacifierCancellationTokens.Remove(pacifierItem);
+                        }
+
+                        // Reset the status and start the 5-second check asynchronously
+                        pacifierItem.Status = "Receiving";
+                        pacifierItem.StatusColor = Brushes.LawnGreen;
+                        _pacifierCancellationTokens[pacifierItem] = new CancellationTokenSource();
+
+                        // Start the async task to check if there were no updates for 5 seconds
+                        _ = CheckForTimeout(pacifierItem, _pacifierCancellationTokens[pacifierItem].Token);
+
+                        // Convert ObservableCollection to List before passing to AppendToCampaignFile
+                        _lineProtocol.AppendToCampaignFile(
+                            _currentCampaignName,
+                            pacifierItemsCount,
+                            pacifierItem.ButtonText,
+                            e.SensorType,
+                            e.ParsedData.ToList(), // Convert to List here
+                            entryTime);
+                        //MessageBox.Show($"Data appended to campaign file for Pacifier: {pacifierItem.PacifierId}, Sensor: {e.SensorType}");
+
+                        var uniqueKey = $"{pacifierItem.PacifierId}_{e.SensorType}";
+
+                        //Check if we should throttle based on pacifier's update frequency
+                        if (_lastUpdateTimestamps.TryGetValue(uniqueKey, out var lastUpdate))
+                        {
+                            var timeDifference = (DateTime.Now - lastUpdate).TotalMilliseconds;
+
+                            // If the time difference is less than the update frequency, skip this update
+                            if (timeDifference < pacifierItem.UpdateFrequency)
                             {
-                                _pacifierCancellationTokens[pacifierItem].Cancel();
-                                _pacifierCancellationTokens.Remove(pacifierItem);
+                                Debug.WriteLine(
+                                    $"Throttle: Skipping update for Pacifier {pacifierItem.PacifierId} and Sensor {e.SensorType}. Time difference: {timeDifference}ms");
+                                return; // Skip the update
                             }
+                        }
 
-                            // Reset the status and start the 5-second check asynchronously
-                            pacifierItem.Status = "Receiving";
-                            pacifierItem.StatusColor = Brushes.LawnGreen;
-                            _pacifierCancellationTokens[pacifierItem] = new CancellationTokenSource();
+                        // Update the timestamp for the pacifier and sensor pair
+                        _lastUpdateTimestamps[uniqueKey] = DateTime.Now;
 
-                            // Start the async task to check if there were no updates for 5 seconds
-                            _ = CheckForTimeout(pacifierItem, _pacifierCancellationTokens[pacifierItem].Token);
+                        if (pacifierItem.IsChecked)
+                        {
+                            //Debug.WriteLine($"FirstOrDefault Pacifier_{pacifierItem.PacifierId}");
+                            // Find or create the SensorItem for the given sensor type
+                            var sensorItem = SensorItems.FirstOrDefault(s => s.SensorId == e.SensorType);
 
-                            // Convert ObservableCollection to List before passing to AppendToCampaignFile
-                            _lineProtocol.AppendToCampaignFile(
-                                _currentCampaignName,
-                                pacifiercount,
-                                pacifierItem.ButtonText,
-                                e.SensorType,
-                                e.ParsedData.ToList(), // Convert to List here
-                                entryTime);
-                            //MessageBox.Show($"Data appended to campaign file for Pacifier: {pacifierItem.PacifierId}, Sensor: {e.SensorType}");
-
-                            string uniqueKey = $"{pacifierItem.PacifierId}_{e.SensorType}";
-
-                            //Check if we should throttle based on pacifier's update frequency
-                            if (_lastUpdateTimestamps.ContainsKey(uniqueKey))
+                            if (sensorItem == null)
                             {
-                                var lastUpdate = _lastUpdateTimestamps[uniqueKey];
-                                var timeDifference = (DateTime.Now - lastUpdate).TotalMilliseconds;
+                                //Debug.WriteLine($"Add Sensor_{e.SensorType}");
+                                // Add a new sensor item if it doesn't exist
+                                sensorItem = new SensorItem(e.SensorType, pacifierItem);
+                                sensorItem.dateTime = dateTime;
+                                pacifierItem.Sensors.Add(sensorItem);
 
-                                // If the time difference is less than the update frequency, skip this update
-                                if (timeDifference < pacifierItem.UpdateFrequency)
+                                // TODO: check what this loop does...
+                                foreach (var dictionary in e.ParsedData)
                                 {
-                                    Debug.WriteLine($"Throttle: Skipping update for Pacifier {pacifierItem.PacifierId} and Sensor {e.SensorType}. Time difference: {timeDifference}ms");
-                                    return; // Skip the update
-                                }
-                            }
-
-                            // Update the timestamp for the pacifier and sensor pair
-                            _lastUpdateTimestamps[uniqueKey] = DateTime.Now;
-
-                            if (pacifierItem.IsChecked)
-                            {
-                                //Debug.WriteLine($"FirstOrDefault Pacifier_{pacifierItem.PacifierId}");
-                                // Find or create the SensorItem for the given sensor type
-                                var sensorItem = SensorItems.FirstOrDefault(s => s.SensorId == e.SensorType);
-
-                                if (sensorItem == null)
-                                {
-                                    //Debug.WriteLine($"Add Sensor_{e.SensorType}");
-                                    // Add a new sensor item if it doesn't exist
-                                    sensorItem = new SensorItem(e.SensorType, pacifierItem);
-                                    sensorItem.dateTime = dateTime;
-                                    pacifierItem.Sensors.Add(sensorItem);
-
-                                    foreach (var dictionary in e.ParsedData)
+                                    if (dictionary.TryGetValue("sensorGroup", out var sensorGroup))
                                     {
-                                        if (dictionary.ContainsKey("sensorGroup"))
+                                        if (!SensorIntervals.ContainsKey(sensorGroup.ToString()))
                                         {
-                                            if (!SensorIntervals.ContainsKey(dictionary["sensorGroup"].ToString()))
-                                            {
-                                                SensorIntervals.Add(dictionary["sensorGroup"].ToString(), 10);
-                                                Debug.WriteLine($"Added sensorGroup {dictionary["sensorGroup"]} with interval 10");
+                                            SensorIntervals.Add(sensorGroup.ToString(), 10);
+                                            Debug.WriteLine(
+                                                $"Added sensorGroup {dictionary["sensorGroup"]} with interval 10");
+                                        }
 
-                                            }
-                                            // Check for uniqueness
-                                            if (!sensorItem.SensorGroups.Contains(dictionary["sensorGroup"].ToString()))
-                                            {
-                                                sensorItem.SensorGroups.Add(dictionary["sensorGroup"].ToString());
-                                            }
+                                        // Check for uniqueness
+                                        if (!sensorItem.SensorGroups.Contains(dictionary["sensorGroup"].ToString()))
+                                        {
+                                            sensorItem.SensorGroups.Add(dictionary["sensorGroup"].ToString());
                                         }
                                     }
-
-
                                 }
-                                else
-                                {
-                                    sensorItem.dateTime = dateTime;
-                                    if (sensorItem.SensorIsChecked)
-                                    {
-                                        pacifierItem.RawData.Clear();
-                                        if (e.Payload != null) pacifierItem.RawData.Add(e.Payload);
-
-                                        //Debug.WriteLine($"Exists Sensor_{sensorItem.SensorId}");
-                                        if (!sensorItem.LinkedPacifiers.Contains(pacifierItem))
-                                        {
-                                            //Debug.WriteLine($"Linked Pacifier_{pacifierItem.PacifierId} to Sensor_{sensorItem.SensorId}");
-                                            sensorItem.LinkedPacifiers.Add(pacifierItem);
-                                        }
-                                        //Debug.WriteLine($"Selected Sensor_{e.SensorType}");
-
-                                        // Add the entire list of dictionaries to the SensorItem
-                                        sensorItem.MeasurementGroup.Clear();
-                                        sensorItem.MeasurementGroup = new ObservableCollection<Dictionary<string, object>>(e.ParsedData);
-
-                                        AddLineSeries(pacifierItem, sensorItem);
-                                        //Debug
-                                        //DisplaySensorDetails(pacifierItem, sensorItem);
-                                    }
-
-                                }
-
-
                             }
                             else
                             {
-                                // Optionally log if the pacifier item was not found or is not checked
-                                //Debug.WriteLine($"PacifierItem with ItemId {e.PacifierId} not found or not checked.");
+                                sensorItem.dateTime = dateTime;
+                                if (!sensorItem.SensorIsChecked)
+                                    return;
+
+                                pacifierItem.RawData.Clear();
+                                //if (e.Payload != null) 
+                                // TODO: need to modify RawData.Add for new Protobuf structure?
+                                // PacifierItem is an ObservableCollection => what's that?
+                                pacifierItem.RawData.Add(e.Payload);
+
+                                //Debug.WriteLine($"Exists Sensor_{sensorItem.SensorId}");
+                                if (!sensorItem.LinkedPacifiers.Contains(pacifierItem))
+                                {
+                                    //Debug.WriteLine($"Linked Pacifier_{pacifierItem.PacifierId} to Sensor_{sensorItem.SensorId}");
+                                    sensorItem.LinkedPacifiers.Add(pacifierItem);
+                                }
+                                //Debug.WriteLine($"Selected Sensor_{e.SensorType}");
+
+                                // Add the entire list of dictionaries to the SensorItem
+                                sensorItem.MeasurementGroup.Clear();
+                                sensorItem.MeasurementGroup =
+                                    new ObservableCollection<Dictionary<string, object>>(e.ParsedData);
+
+                                AddLineSeries(pacifierItem, sensorItem);
+                                //Debug
+                                //DisplaySensorDetails(pacifierItem, sensorItem);
                             }
+                        }
+                        else
+                        {
+                            // Optionally log if the pacifier item was not found or is not checked
+                            //Debug.WriteLine($"PacifierItem with ItemId {e.PacifierId} not found or not checked.");
                         }
                     });
                 }
@@ -298,15 +300,16 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab.MonitoringExtra
                 //Debug.WriteLine($"Message skipped - PacifierId: {e.PacifierId} not in selected list or invalid data.");
             }
         }
+
         private async Task CheckForTimeout(PacifierItem pacifierItem, CancellationToken token)
         {
             //try
             //{
-                // Wait for 5 seconds or until the cancellation token is triggered
-                await Task.Delay(5000, token);
+            // Wait for 5 seconds or until the cancellation token is triggered
+            await Task.Delay(5000, token);
 
-                pacifierItem.Status = "Not Receiving";
-                pacifierItem.StatusColor = Brushes.Red; // Changes the circle to red
+            pacifierItem.Status = "Not Receiving";
+            pacifierItem.StatusColor = Brushes.Red; // Changes the circle to red
 
 
             // If we reach here, it means 5 seconds passed without a new message
@@ -322,7 +325,6 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab.MonitoringExtra
 
         private void AddLineSeries(PacifierItem pacifierItem, SensorItem sensorItem)
         {
-
             foreach (var measurementGraph in sensorItem.SensorGraphs)
             {
                 //Debug.WriteLine($"AddLineSeries for Sensor {sensorItem.SensorId} to Graph {measurementGraph.Uid}");
@@ -330,93 +332,90 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab.MonitoringExtra
             }
         }
 
-
-
+        // TODO: check this for protobuf changes!
         private void AddDataToGraphs(LineChartGraph measurementGraph, SensorItem sensorItem, PacifierItem pacifierItem)
         {
-
             foreach (var sensorGroup in sensorItem.MeasurementGroup)
             {
                 var firstKvp = sensorGroup.FirstOrDefault();
-                string uniquePlotId = $"{sensorItem.SensorId}_{firstKvp.Value}_{pacifierItem.PacifierId}";
+                var uniquePlotId = $"{sensorItem.SensorId}_{firstKvp.Value}_{pacifierItem.PacifierId}";
 
-                if (measurementGraph.PlotId == uniquePlotId)
+                if (measurementGraph.PlotId != uniquePlotId)
+                    return;
+
+                //if (_lastUpdateTimestamps.ContainsKey(uniquePlotId))
+                //{
+                //    var lastUpdate = _lastUpdateTimestamps[uniquePlotId];
+                //    var timeDifference = (DateTime.Now - lastUpdate).TotalMilliseconds;
+
+                //    // If the time difference is less than the update frequency, skip this update
+                //    if (timeDifference < pacifierItem.UpdateFrequency)
+                //    {
+                //        Debug.WriteLine($"Throttle: Skipping update for Pacifier {pacifierItem.PacifierId} and Sensor {sensorItem.SensorId}. Time difference: {timeDifference}ms");
+                //        return; // Skip the update
+                //    }
+                //}
+
+                //// Update the timestamp for the pacifier and sensor pair
+                //_lastUpdateTimestamps[uniquePlotId] = DateTime.Now;
+
+                foreach (var kvp in sensorGroup)
                 {
-                    //if (_lastUpdateTimestamps.ContainsKey(uniquePlotId))
-                    //{
-                    //    var lastUpdate = _lastUpdateTimestamps[uniquePlotId];
-                    //    var timeDifference = (DateTime.Now - lastUpdate).TotalMilliseconds;
+                    if (kvp.Key == "sensorGroup") continue; // Skip the sensorGroup field
 
-                    //    // If the time difference is less than the update frequency, skip this update
-                    //    if (timeDifference < pacifierItem.UpdateFrequency)
-                    //    {
-                    //        Debug.WriteLine($"Throttle: Skipping update for Pacifier {pacifierItem.PacifierId} and Sensor {sensorItem.SensorId}. Time difference: {timeDifference}ms");
-                    //        return; // Skip the update
-                    //    }
-                    //}
+                    // Find the existing LineSeries for this sensor group (or create a new one if not found)
+                    var existingSeries =
+                        measurementGraph.LineSeriesCollection.FirstOrDefault(series => series.Title == kvp.Key);
 
-                    //// Update the timestamp for the pacifier and sensor pair
-                    //_lastUpdateTimestamps[uniquePlotId] = DateTime.Now;
-
-                    foreach (var kvp in sensorGroup)
+                    OxyColor[] blueShades = new OxyColor[]
                     {
-                        if (kvp.Key == "sensorGroup") continue; // Skip the sensorGroup field
+                        OxyColor.FromRgb(0, 0, 255), // Pure Blue
+                        OxyColor.FromRgb(90, 90, 255), // Even lighter Blue
+                        OxyColor.FromRgb(255, 255, 255), // Light Blue
+                        OxyColor.FromRgb(120, 120, 255), // Very light Blue
+                        OxyColor.FromRgb(60, 60, 255) // Lighter Blue
+                    };
 
-                        // Find the existing LineSeries for this sensor group (or create a new one if not found)
-                        var existingSeries = measurementGraph.LineSeriesCollection.FirstOrDefault(series => series.Title == kvp.Key);
-
-                        OxyColor[] blueShades = new OxyColor[]
+                    if (existingSeries == null)
+                    {
+                        existingSeries = new LineSeries
                         {
-                            OxyColor.FromRgb(0, 0, 255),    // Pure Blue
-                            OxyColor.FromRgb(90, 90, 255),  // Even lighter Blue
-                            OxyColor.FromRgb(255, 255, 255),  // Light Blue
-                            OxyColor.FromRgb(120, 120, 255), // Very light Blue
-                            OxyColor.FromRgb(60, 60, 255)  // Lighter Blue
+                            Title = kvp.Key,
+                            MarkerType = MarkerType.None,
+                            MarkerSize = 2,
+                            Color = blueShades[measurementGraph.LineSeriesCollection.Count % blueShades.Length]
                         };
-
-                        if (existingSeries == null)
-                        {
-                            existingSeries = new LineSeries
-                            {
-                                Title = kvp.Key,
-                                MarkerType = MarkerType.None,
-                                MarkerSize = 2,
-                                Color = blueShades[measurementGraph.LineSeriesCollection.Count % blueShades.Length]
-                            };
-                            measurementGraph.LineSeriesCollection.Add(existingSeries);
-                            measurementGraph.PlotModel.Series.Add(existingSeries);
-                        }
-
-                        DateTime xValue = sensorItem.dateTime;
-                        double yValue = Convert.ToDouble(kvp.Value);
-
-                        existingSeries.Points.Add(new DataPoint(DateTimeAxis.ToDouble(xValue), yValue));
-
-                        // Enforce point limit based on sensor intervals
-                        if (existingSeries.Points.Count > SensorIntervals[measurementGraph.Name])
-                        {
-                            int difference = existingSeries.Points.Count - SensorIntervals[measurementGraph.Name];
-                            for (int i = 0; i <= difference; i++)
-                            {
-                                existingSeries.Points.RemoveAt(0);
-                            }
-                        }
+                        measurementGraph.LineSeriesCollection.Add(existingSeries);
+                        measurementGraph.PlotModel.Series.Add(existingSeries);
                     }
 
-                    measurementGraph.PlotModel.IsLegendVisible = true;
-                    measurementGraph.PlotModel.InvalidatePlot(true);
+                    DateTime xValue = sensorItem.dateTime;
+                    double yValue = Convert.ToDouble(kvp.Value);
+
+                    existingSeries.Points.Add(new DataPoint(DateTimeAxis.ToDouble(xValue), yValue));
+
+                    // Enforce point limit based on sensor intervals
+                    if (existingSeries.Points.Count > SensorIntervals[measurementGraph.Name])
+                    {
+                        int difference = existingSeries.Points.Count - SensorIntervals[measurementGraph.Name];
+                        for (int i = 0; i <= difference; i++)
+                        {
+                            existingSeries.Points.RemoveAt(0);
+                        }
+                    }
                 }
+
+                measurementGraph.PlotModel.IsLegendVisible = true;
+                measurementGraph.PlotModel.InvalidatePlot(true);
             }
         }
 
         // Property changed notification
         public event PropertyChangedEventHandler? PropertyChanged;
+
         private void OnPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
-
     }
-
-
 }

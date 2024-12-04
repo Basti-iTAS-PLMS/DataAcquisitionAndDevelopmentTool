@@ -18,7 +18,7 @@ namespace SmartPacifier.BackEnd.CommunicationLayer.MQTT
         public BrokerMain()
         {
             _broker = Broker.Instance;
-            _broker.MessageReceived += OnMessageReceived;
+            // _broker.MessageReceived += OnMessageReceived;
         }
 
         public async Task StartAsync(string[] args)
