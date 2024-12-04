@@ -53,7 +53,6 @@ namespace Smart_Pacifier___Tool
                     throw new InvalidOperationException("Failed to parse configuration file.");
                 }
 
-                Console.WriteLine($"Read Mqtt config: {config.Mqtt}");
                 return config;
             }
             catch (Newtonsoft.Json.JsonException ex)
