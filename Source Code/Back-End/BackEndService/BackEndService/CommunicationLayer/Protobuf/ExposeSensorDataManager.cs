@@ -78,7 +78,6 @@ namespace SmartPacifier.BackEnd.CommunicationLayer.Protobuf
                 //parsedData = ExtractAllFields(sensorData, fieldDescriptorMap);
 
                 // Display parsed fields immediately
-                Console.WriteLine($"Parsed data for Pacifier {pacifierId} on sensor type '{sensorType}':");
                 //DisplayParsedFields(parsedData);
 
                 // Add to sensor data list and trigger event

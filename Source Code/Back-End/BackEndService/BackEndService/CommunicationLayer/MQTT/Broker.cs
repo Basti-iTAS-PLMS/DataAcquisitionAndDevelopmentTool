@@ -131,8 +131,6 @@ namespace SmartPacifier.BackEnd.CommunicationLayer.MQTT
                 byte[] rawPayload = e.ApplicationMessage.PayloadSegment.ToArray();
                 string topic = e.ApplicationMessage.Topic;
 
-                Console.WriteLine($"Received raw data on topic '{topic}'");
-
                 if (rawPayload.Length > 0)
                 {
                     string[] topicParts = topic.Split('/');
@@ -141,15 +139,6 @@ namespace SmartPacifier.BackEnd.CommunicationLayer.MQTT
                         string pacifierId = topicParts[1];
                         var (parsedPacifierId, parsedSensorType, parsedData) =
                             ExposeSensorDataManager.Instance.ParseSensorData(rawPayload);
-
-                        foreach (var sensorGroup in parsedData)
-                        {
-                            Console.WriteLine($"Pacifier: {parsedPacifierId} - Sensor: {parsedSensorType}");
-                            foreach (var kvp in sensorGroup)
-                            {
-                                Console.WriteLine($"     {kvp.Key}: {kvp.Value}");
-                            }
-                        }
 
                         MessageReceived?.Invoke(this,
                             new MessageReceivedEventArgs(topic, rawPayload, parsedPacifierId, parsedSensorType,

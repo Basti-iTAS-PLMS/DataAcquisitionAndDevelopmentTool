@@ -77,22 +77,18 @@ namespace SmartPacifier.BackEnd.CommunicationLayer.MQTT
 
                 var (parsedPacifierId, sensorType, parsedData) = ExposeSensorDataManager.Instance.ParseSensorData(e.Payload);
 
-                if (parsedData != null)
-                {
-                    Console.WriteLine($"Parsed data for Pacifier {parsedPacifierId} on sensor type '{sensorType}':");
-                    //foreach (var dataEntry in parsedData)
-                    //{
-                    //    Console.WriteLine($"{dataEntry.Key}: {dataEntry.Value}");
-                    //}
-
-                    foreach (var dataEntry in parsedData)
-                    {
-                        foreach (var kvp in dataEntry)
-                        {
-                            Console.WriteLine($"    {kvp.Key}: {kvp.Value}");
-                        }
-                    }
-                }
+                // if (parsedData.Count > 0)
+                // {
+                //     Console.WriteLine($"Parsed data for Pacifier {parsedPacifierId} on sensor type '{sensorType}':");
+                //
+                //     foreach (var dataEntry in parsedData)
+                //     {
+                //         foreach (var kvp in dataEntry)
+                //         {
+                //             Console.WriteLine($"    {kvp.Key}: {kvp.Value}");
+                //         }
+                //     }
+                // }
 
                 // Forward the parsed data to Python using SensorDataForwardingService
                 try
@@ -115,8 +111,6 @@ namespace SmartPacifier.BackEnd.CommunicationLayer.MQTT
 
                     // Forward the parsed data to the Python script (use await instead of Wait)
                     await forwardingService.ForwardAndProcessDataAsync(parsedPacifierId, sensorType, parsedData);
-
-                    Console.WriteLine($"Forwarded data for Pacifier {parsedPacifierId} on sensor type '{sensorType}' to Python script.");
                 }
                 catch (Exception forwardEx)
                 {
