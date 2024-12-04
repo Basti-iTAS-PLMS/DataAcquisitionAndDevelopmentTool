@@ -641,7 +641,6 @@ namespace Smart_Pacifier___Tool.Tabs.SettingsTab
         private void ReloadDatabaseConfiguration()
         {
             var app = (App)Application.Current;
-            var config = app.LoadDatabaseConfiguration();
 
             // Reconfigure services with the new configuration
             app.ConfigureServices(new ServiceCollection());
