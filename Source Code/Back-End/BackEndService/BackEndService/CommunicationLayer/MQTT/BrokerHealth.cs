@@ -50,7 +50,7 @@ namespace SmartPacifier.BackEnd.CommunicationLayer.MQTT
             var brokerPort = (int)Broker.Instance.BrokerPort;
             try
             {
-                //TODO: why do we need typ here? Python Execution?
+                //TODO: why do we need tcp here? Python Execution?
                 using (var tcpClient = new TcpClient())
                 {
                     await tcpClient.ConnectAsync(brokerAddress, brokerPort);

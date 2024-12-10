@@ -1,26 +1,15 @@
 ﻿using Smart_Pacifier___Tool.Components;
 using SmartPacifier.BackEnd.CommunicationLayer.MQTT;
-using SmartPacifier.BackEnd.CommunicationLayer.Protobuf;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Windows;
-using static Smart_Pacifier___Tool.Components.LineChartGraph;
-using static SmartPacifier.BackEnd.CommunicationLayer.MQTT.Broker;
 using System.Windows.Controls;
-using static Smart_Pacifier___Tool.Components.PacifierItem;
-using System.Runtime.Intrinsics.X86;
-using System.IO.Packaging;
 using OxyPlot.Series;
 using OxyPlot;
 using OxyPlot.Axes;
 using SmartPacifier.Interface.Services;
-using InfluxDB.Client.Api.Domain;
 using System.Windows.Media;
+using IronPython.Modules;
 
 namespace Smart_Pacifier___Tool.Tabs.MonitoringTab.MonitoringExtra
 {
@@ -34,9 +23,9 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab.MonitoringExtra
         public ObservableCollection<PacifierItem> _checkedPacifierItems = [];
         public ObservableCollection<SensorItem> _checkedSensorItems = [];
 
-        public Dictionary<string, int> SensorIntervals { get; private set; } = new Dictionary<string, int>();
+        public Dictionary<string, int> SensorIntervals { get; private set; } = [];
 
-        public Dictionary<string, DateTime> _lastUpdateTimestamps = new Dictionary<string, DateTime>();
+        public Dictionary<string, DateTime> _lastUpdateTimestamps = [];
 
         // Maps for storing grid and row references
         public Dictionary<PacifierItem, Grid> PacifierGridMap = new Dictionary<PacifierItem, Grid>();
@@ -232,22 +221,26 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab.MonitoringExtra
                                 pacifierItem.Sensors.Add(sensorItem);
 
                                 // TODO: check what this loop does...
+
                                 foreach (var dictionary in e.ParsedData)
                                 {
-                                    if (dictionary.TryGetValue("sensorGroup", out var sensorGroup))
-                                    {
-                                        if (!SensorIntervals.ContainsKey(sensorGroup.ToString()))
-                                        {
-                                            SensorIntervals.Add(sensorGroup.ToString(), 10);
-                                            Debug.WriteLine(
-                                                $"Added sensorGroup {dictionary["sensorGroup"]} with interval 10");
-                                        }
+                                    if (!dictionary.TryGetValue("sensorGroup", out var sensorGroup))
+                                        continue;
 
-                                        // Check for uniqueness
-                                        if (!sensorItem.SensorGroups.Contains(dictionary["sensorGroup"].ToString()))
-                                        {
-                                            sensorItem.SensorGroups.Add(dictionary["sensorGroup"].ToString());
-                                        }
+                                    var sensorGroupName = sensorGroup?.ToString();
+                                    if (string.IsNullOrEmpty(sensorGroupName))
+                                        continue;
+
+                                    if (SensorIntervals.TryAdd(sensorGroupName, 10))
+                                    {
+                                        Debug.WriteLine(
+                                            $"Added sensorGroup {dictionary["sensorGroup"]} with interval 10");
+                                    }
+
+                                    // Check for uniqueness
+                                    if (!sensorItem.SensorGroups.Contains(sensorGroupName))
+                                    {
+                                        sensorItem.SensorGroups.Add(sensorGroupName);
                                     }
                                 }
                             }
@@ -258,7 +251,7 @@ namespace Smart_Pacifier___Tool.Tabs.MonitoringTab.MonitoringExtra
                                     return;
 
                                 pacifierItem.RawData.Clear();
-                                //if (e.Payload != null) 
+                                //if (e.Payload != null)
                                 // TODO: need to modify RawData.Add for new Protobuf structure?
                                 // PacifierItem is an ObservableCollection => what's that?
                                 pacifierItem.RawData.Add(e.Payload);
